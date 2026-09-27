@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install lint tools
+        run: pip install flake8
+      - name: Run flake8
+        run: flake8 app.py test_app.py --max-line-length=100
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+      - name: Run tests
+        env:
+          APP_CONFIG_KEY: test-value
+        run: pytest -v
+
+  build:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Print config variable
+        run: echo "APP_CONFIG_KEY value is: [${{ secrets.APP_CONFIG_KEY }}]"
+      - name: Set image tag
+        run: echo "IMAGE_TAG=janus48/internal-tool:${GITHUB_REF_NAME//\//-}" >> $GITHUB_ENV
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+      - name: Build Docker image
+        run: docker build -t "$IMAGE_TAG" .
+      - name: Smoke test container
+        run: |
+          docker run -d --name smoke-test -p 5000:5000 -e APP_CONFIG_KEY=${{ secrets.APP_CONFIG_KEY }} "$IMAGE_TAG"
+          sleep 3
+          docker logs smoke-test
+          curl -f http://localhost:5000/
+          docker stop smoke-test
+      - name: Push image to Docker Hub
+        run: docker push "$IMAGE_TAG"
