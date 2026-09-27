@@ -40,7 +40,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Print config variable
-        run: echo "APP_CONFIG_KEY value is: [${{ secrets.APP_CONFIG_KEY }}]"
+        run: |
+          echo "APP_CONFIG_KEY value is: [${{ secrets.APP_CONFIG_KEY }}]"
       - name: Set image tag
         run: echo "IMAGE_TAG=janus48/internal-tool:${GITHUB_REF_NAME//\//-}" >> $GITHUB_ENV
       - name: Log in to Docker Hub
